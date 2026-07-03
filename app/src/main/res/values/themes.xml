@@ -1,0 +1,11 @@
+<resources>
+    <!-- Compose renders the real UI; this base theme only styles the window
+         chrome (a dark, edge-to-edge canvas with the Marauder background). -->
+    <style name="Theme.MarauderMobile" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/marauder_bg</item>
+        <item name="android:statusBarColor">@color/marauder_bg</item>
+        <item name="android:navigationBarColor">@color/marauder_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

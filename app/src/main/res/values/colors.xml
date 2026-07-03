@@ -1,0 +1,6 @@
+<resources>
+    <!-- Used by the XML app theme + adaptive icon background so the very first
+         frame (before Compose draws) already matches the app's dark canvas. -->
+    <color name="marauder_bg">#FF0A0C10</color>
+    <color name="marauder_primary">#FF00D5FF</color>
+</resources>

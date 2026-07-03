@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Marauder</string>
+    <string name="usb_permission">com.marauder.mobile.USB_PERMISSION</string>
+</resources>

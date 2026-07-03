@@ -1,0 +1,33 @@
+# Built output
+*.apk
+*.aab
+*.ap_
+*.aar
+build/
+app/build/
+
+# Gradle
+.gradle/
+local.properties
+
+# Release signing — keep secrets out of the repo
+keystore.properties
+*.jks
+*.keystore
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Kotlin
+.kotlin/
+
+# OS / editor cruft
+.DS_Store
+*.log
+
+# Static-analysis cache (Snyk / DeepCode)
+.dccache
