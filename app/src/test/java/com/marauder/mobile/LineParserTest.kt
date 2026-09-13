@@ -95,4 +95,23 @@ class LineParserTest {
         assertEquals(listOf(3, 7, 2), msg.values)
         assertEquals(1, msg.page)
     }
+
+    @Test
+    fun parsesEvilPortalUploadConfirm() {
+        val line = "@J {\"t\":\"portal\",\"state\":\"set\",\"n\":2048,\"crc\":3735928559,\"ok\":true}"
+        val msg = (LineParser.parse(line) as ParsedLine.Structured).message as DeviceMessage.Portal
+        assertEquals("set", msg.state)
+        assertEquals(2048, msg.bytes)
+        assertEquals(3735928559L, msg.crc)
+        assertTrue(msg.ok)
+    }
+
+    @Test
+    fun parsesCapturedCredential() {
+        // Escaped characters in the submitted values must survive decoding.
+        val line = "@J {\"t\":\"cred\",\"u\":\"a\\\"b\",\"p\":\"p@ss w0rd\"}"
+        val msg = (LineParser.parse(line) as ParsedLine.Structured).message as DeviceMessage.Cred
+        assertEquals("a\"b", msg.user)
+        assertEquals("p@ss w0rd", msg.pass)
+    }
 }

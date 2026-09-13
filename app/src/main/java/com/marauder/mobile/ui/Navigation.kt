@@ -29,6 +29,7 @@ import com.marauder.mobile.ui.screens.AboutScreen
 import com.marauder.mobile.ui.screens.AnalyzerScreen
 import com.marauder.mobile.ui.screens.ConnectScreen
 import com.marauder.mobile.ui.screens.ConsoleScreen
+import com.marauder.mobile.ui.screens.EvilPortalScreen
 import com.marauder.mobile.ui.screens.FlashScreen
 import com.marauder.mobile.ui.screens.ListScreen
 import com.marauder.mobile.ui.screens.LiveActivityScreen
@@ -45,6 +46,7 @@ private object Routes {
     const val LIVE = "live"
     const val ABOUT = "about"
     const val FLASH = "flash"
+    const val EVIL_PORTAL = "evil_portal_screen"
     fun menu(id: String) = "$MENU/$id"
     fun list(type: ListType) = "$LIST/${type.name}"
     fun analyzer(kind: AnalyzerKind, command: String) = "$ANALYZER/${kind.name}/${Uri.encode(command)}"
@@ -105,6 +107,10 @@ fun AppRoot() {
 
             composable(Routes.FLASH) {
                 FlashScreen(vm = vm, onBack = { nav.popBackStack() })
+            }
+
+            composable(Routes.EVIL_PORTAL) {
+                EvilPortalScreen(vm = vm, onBack = { nav.popBackStack() })
             }
 
             composable(
@@ -187,5 +193,6 @@ private fun handleAction(
         is MenuAction.OpenAnalyzer -> nav.navigate(Routes.analyzer(action.kind, action.command))
         MenuAction.OpenConsole -> nav.navigate(Routes.CONSOLE)
         MenuAction.OpenFlash -> nav.navigate(Routes.FLASH)
+        MenuAction.OpenEvilPortal -> nav.navigate(Routes.EVIL_PORTAL)
     }
 }

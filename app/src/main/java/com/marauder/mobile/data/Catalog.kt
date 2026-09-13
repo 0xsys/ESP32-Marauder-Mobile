@@ -111,6 +111,10 @@ sealed interface MenuAction {
 
     /** Open the firmware flasher / updater. */
     data object OpenFlash : MenuAction
+
+    /** Open the Evil Portal screen: pick an HTML page on the phone, upload it to
+     *  the device (no SD card), target a scanned AP, run, and watch credentials. */
+    data object OpenEvilPortal : MenuAction
 }
 
 data class MenuItem(
@@ -232,11 +236,9 @@ object Catalog {
             MenuScreen(
                 "evil_portal", "Evil Portal",
                 listOf(
-                    MenuItem("Access Points", "Pick a target AP", Icons.Filled.Wifi, Accent.GENERAL, MenuAction.OpenList(ListType.ACCESS_POINTS)),
-                    MenuItem("Set AP #0", "evilportal -c setap 0", Icons.Filled.Router, Accent.ATTACK, MenuAction.Send("evilportal -c setap 0")),
-                    MenuItem("Set HTML (index.html)", "evilportal -c sethtml index.html", Icons.Filled.Code, Accent.ATTACK, MenuAction.Send("evilportal -c sethtml index.html")),
-                    MenuItem("Start", "evilportal -c start", Icons.Filled.PlayArrow, Accent.ATTACK, MenuAction.Send("evilportal -c start"), dangerous = true),
-                    MenuItem("Start (index.html)", "evilportal -c start -w index.html", Icons.Filled.PlayCircle, Accent.ATTACK, MenuAction.Send("evilportal -c start -w index.html"), dangerous = true),
+                    MenuItem("Portal (phone HTML)", "Pick a page from the phone, no SD card", Icons.Filled.Language, Accent.ATTACK, MenuAction.OpenEvilPortal, dangerous = true),
+                    MenuItem("Scan APs first", "Find a target AP to impersonate", Icons.Filled.Wifi, Accent.GENERAL, MenuAction.OpenList(ListType.ACCESS_POINTS)),
+                    MenuItem("Start (SD index.html)", "evilportal -c start -w index.html", Icons.Filled.PlayCircle, Accent.ATTACK, MenuAction.Send("evilportal -c start -w index.html"), dangerous = true),
                 ),
             ),
         )

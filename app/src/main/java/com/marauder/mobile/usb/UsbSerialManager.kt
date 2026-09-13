@@ -80,6 +80,7 @@ class UsbSerialManager(context: Context) {
     companion object {
         const val BAUD = 115200
         private const val WRITE_TIMEOUT_MS = 1000
+        private const val RAW_CHUNK = 1024
         private const val ACTION_USB_PERMISSION = "com.marauder.mobile.USB_PERMISSION"
 
         fun deviceLabel(device: UsbDevice): String =
@@ -217,6 +218,30 @@ class UsbSerialManager(context: Context) {
                 p.write((text + "\n").toByteArray(Charsets.UTF_8), WRITE_TIMEOUT_MS)
             } catch (e: Exception) {
                 emitEvent("Write failed: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Write raw bytes with NO trailing newline. Used to stream an Evil Portal
+     * HTML page right after `evilportal -c sethtmlstr <len>`: the caller waits for
+     * the device's `{"t":"portal","state":"recv"}` reply, then sends exactly the
+     * announced number of bytes here. Written in modest chunks on the IO
+     * dispatcher so the device's serial RX buffer keeps up at high baud.
+     */
+    fun sendRaw(bytes: ByteArray) {
+        if (bytes.isEmpty()) return
+        scope.launch {
+            val p = port ?: run { emitEvent("Not connected"); return@launch }
+            try {
+                var off = 0
+                while (off < bytes.size) {
+                    val end = minOf(off + RAW_CHUNK, bytes.size)
+                    p.write(bytes.copyOfRange(off, end), WRITE_TIMEOUT_MS)
+                    off = end
+                }
+            } catch (e: Exception) {
+                emitEvent("Raw write failed: ${e.message}")
             }
         }
     }

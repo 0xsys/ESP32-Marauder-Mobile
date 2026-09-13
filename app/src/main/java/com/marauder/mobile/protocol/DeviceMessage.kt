@@ -86,6 +86,20 @@ sealed interface DeviceMessage {
 
     data class Err(val cmd: String, val arg: String) : DeviceMessage
 
+    /** Evil Portal host-supplied page (proto >= 2). `state` is "recv" (device
+     *  ready, [max] = buffer capacity) then "set" ([bytes] stored, [crc] of the
+     *  received bytes, [ok] when the upload matched). */
+    data class Portal(
+        val state: String,
+        val bytes: Int,
+        val max: Int,
+        val crc: Long,
+        val ok: Boolean,
+    ) : DeviceMessage
+
+    /** One captured Evil Portal form submission (username + password). */
+    data class Cred(val user: String, val pass: String) : DeviceMessage
+
     /** One rolling-graph sample (Channel Analyzer / BT Analyzer). */
     data class AnalyzerSample(val mode: Int, val channel: Int, val value: Int) : DeviceMessage
 

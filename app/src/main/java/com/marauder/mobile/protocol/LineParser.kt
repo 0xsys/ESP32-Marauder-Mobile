@@ -128,6 +128,19 @@ object LineParser {
                 arg = obj.str("arg").orEmpty(),
             )
 
+            "portal" -> DeviceMessage.Portal(
+                state = obj.str("state").orEmpty(),
+                bytes = obj.int("n"),
+                max = obj.int("max"),
+                crc = obj.long("crc"),
+                ok = obj.bool("ok"),
+            )
+
+            "cred" -> DeviceMessage.Cred(
+                user = obj.str("u").orEmpty(),
+                pass = obj.str("p").orEmpty(),
+            )
+
             "asample" -> DeviceMessage.AnalyzerSample(
                 mode = obj.int("mode"),
                 channel = obj.int("ch"),
