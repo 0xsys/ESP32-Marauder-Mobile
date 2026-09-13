@@ -27,6 +27,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * Owns the USB-OTG serial link to the ESP32 Marauder. Exposes incoming lines and
@@ -208,41 +211,60 @@ class UsbSerialManager(context: Context) {
         runCatching { port?.setParameters(rate, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE) }
     }
 
+    // Serializes every write to the port. Without it a background poll
+    // (`jsonstatus` every ~2.5 s) can interleave its bytes into the middle of a
+    // raw binary upload (Evil Portal HTML), corrupting it. All writers take this.
+    private val writeMutex = Mutex()
+
     /** Queue a command (a newline is appended). Written on the IO dispatcher. */
     fun send(command: String) {
         val text = command.trim()
         if (text.isEmpty()) return
-        scope.launch {
-            val p = port ?: run { emitEvent("Not connected"); return@launch }
-            try {
-                p.write((text + "\n").toByteArray(Charsets.UTF_8), WRITE_TIMEOUT_MS)
-            } catch (e: Exception) {
-                emitEvent("Write failed: ${e.message}")
-            }
-        }
+        scope.launch { writeMutex.withLock { writeLine(text) } }
     }
 
     /**
-     * Write raw bytes with NO trailing newline. Used to stream an Evil Portal
-     * HTML page right after `evilportal -c sethtmlstr <len>`: the caller waits for
-     * the device's `{"t":"portal","state":"recv"}` reply, then sends exactly the
-     * announced number of bytes here. Written in modest chunks on the IO
-     * dispatcher so the device's serial RX buffer keeps up at high baud.
+     * Run [block] holding an exclusive serial-write lock, so no queued `send()`
+     * (e.g. a background `jsonstatus` poll) can interleave. Used for the Evil
+     * Portal upload, whose command line + raw payload must reach the device
+     * uninterrupted. The device→app read path is unaffected, so awaiting a reply
+     * inside [block] is safe.
      */
-    fun sendRaw(bytes: ByteArray) {
-        if (bytes.isEmpty()) return
-        scope.launch {
-            val p = port ?: run { emitEvent("Not connected"); return@launch }
-            try {
-                var off = 0
-                while (off < bytes.size) {
-                    val end = minOf(off + RAW_CHUNK, bytes.size)
-                    p.write(bytes.copyOfRange(off, end), WRITE_TIMEOUT_MS)
-                    off = end
-                }
-            } catch (e: Exception) {
-                emitEvent("Raw write failed: ${e.message}")
+    suspend fun <T> withWriteLock(block: suspend () -> T): T = writeMutex.withLock { block() }
+
+    /** Write a command line (+`\n`). The caller MUST already hold [withWriteLock]. */
+    suspend fun sendLineLocked(command: String) = withContext(Dispatchers.IO) {
+        val p = port ?: run { emitEvent("Not connected"); return@withContext }
+        try {
+            p.write((command.trim() + "\n").toByteArray(Charsets.UTF_8), WRITE_TIMEOUT_MS)
+        } catch (e: Exception) {
+            emitEvent("Write failed: ${e.message}")
+        }
+    }
+
+    /** Write raw bytes with NO trailing newline, in modest chunks. The caller MUST
+     *  already hold [withWriteLock]. Used to stream an Evil Portal HTML page. */
+    suspend fun sendRawLocked(bytes: ByteArray) = withContext(Dispatchers.IO) {
+        if (bytes.isEmpty()) return@withContext
+        val p = port ?: run { emitEvent("Not connected"); return@withContext }
+        try {
+            var off = 0
+            while (off < bytes.size) {
+                val end = minOf(off + RAW_CHUNK, bytes.size)
+                p.write(bytes.copyOfRange(off, end), WRITE_TIMEOUT_MS)
+                off = end
             }
+        } catch (e: Exception) {
+            emitEvent("Raw write failed: ${e.message}")
+        }
+    }
+
+    private fun writeLine(text: String) {
+        val p = port ?: run { emitEvent("Not connected"); return }
+        try {
+            p.write((text + "\n").toByteArray(Charsets.UTF_8), WRITE_TIMEOUT_MS)
+        } catch (e: Exception) {
+            emitEvent("Write failed: ${e.message}")
         }
     }
 

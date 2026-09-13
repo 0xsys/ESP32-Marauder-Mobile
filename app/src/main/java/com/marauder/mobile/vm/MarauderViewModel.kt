@@ -33,6 +33,7 @@ import com.marauder.mobile.usb.UsbSerialManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -564,43 +565,52 @@ class MarauderViewModel(application: Application) : AndroidViewModel(application
                 htmlBytes = bytes.size,
                 message = "Uploading ${bytes.size} B…",
             )
-            // Start listening BEFORE sending so the reply can't be missed.
-            val recvWait = async { withTimeoutOrNull(3000) { portalEvents.first { it.state == "recv" } } }
-            appendConsole("> evilportal -c sethtmlstr ${bytes.size}", LineKind.INPUT)
-            usb.send("evilportal -c sethtmlstr ${bytes.size}")
-            val recv = recvWait.await()
-
-            if (recv != null && recv.max in 1 until bytes.size) {
-                _evilPortal.value = _evilPortal.value.copy(
-                    phase = EvilPortalUiState.Phase.Error,
-                    deviceMax = recv.max,
-                    message = "Page too large: ${bytes.size} B > device max ${recv.max} B",
-                )
-                return@launch
+            var recv: DeviceMessage.Portal? = null
+            var set: DeviceMessage.Portal? = null
+            // Hold the serial write lock across the whole handshake so a background
+            // `jsonstatus` poll can't inject bytes into the raw payload (which would
+            // corrupt it and fail the device's CRC check).
+            usb.withWriteLock {
+                coroutineScope {
+                    // Start listening BEFORE sending so the reply can't be missed.
+                    val recvWait = async { withTimeoutOrNull(3000) { portalEvents.first { it.state == "recv" } } }
+                    appendConsole("> evilportal -c sethtmlstr ${bytes.size}", LineKind.INPUT)
+                    usb.sendLineLocked("evilportal -c sethtmlstr ${bytes.size}")
+                    recv = recvWait.await()
+                    // Send the payload unless the device said its buffer is too small.
+                    if (recv?.max?.let { it in 1 until bytes.size } != true) {
+                        val setWait = async { withTimeoutOrNull(8000) { portalEvents.first { it.state == "set" } } }
+                        usb.sendRawLocked(bytes)
+                        set = setWait.await()
+                    }
+                }
             }
 
-            val setWait = async { withTimeoutOrNull(8000) { portalEvents.first { it.state == "set" } } }
-            usb.sendRaw(bytes)
-            val set = setWait.await()
+            val r = recv
+            val s = set
             val localCrc = Crc32.compute(bytes, 0, bytes.size, ByteArray(0), 0)
-
             _evilPortal.value = when {
-                set == null -> _evilPortal.value.copy(
+                r != null && r.max in 1 until bytes.size -> _evilPortal.value.copy(
+                    phase = EvilPortalUiState.Phase.Error,
+                    deviceMax = r.max,
+                    message = "Page too large: ${bytes.size} B > device max ${r.max} B",
+                )
+                s == null -> _evilPortal.value.copy(
                     phase = EvilPortalUiState.Phase.Error,
                     message = "No confirmation from device — check the cable and retry",
                 )
-                set.ok && set.crc == localCrc -> _evilPortal.value.copy(
+                s.ok && s.crc == localCrc -> _evilPortal.value.copy(
                     phase = EvilPortalUiState.Phase.Ready,
-                    deviceMax = if (set.max > 0) set.max else _evilPortal.value.deviceMax,
-                    message = "Page set on device — ${set.bytes} B, CRC verified",
+                    deviceMax = if (s.max > 0) s.max else _evilPortal.value.deviceMax,
+                    message = "Page set on device — ${s.bytes} B, CRC verified",
                 )
-                set.ok -> _evilPortal.value.copy(
+                s.ok -> _evilPortal.value.copy(
                     phase = EvilPortalUiState.Phase.Error,
-                    message = "CRC mismatch (device ${set.crc}, phone $localCrc) — retry",
+                    message = "CRC mismatch (device ${s.crc}, phone $localCrc) — retry",
                 )
                 else -> _evilPortal.value.copy(
                     phase = EvilPortalUiState.Phase.Error,
-                    message = "Device rejected the upload (${set.bytes}/${bytes.size} B) — retry",
+                    message = "Device rejected the upload (${s.bytes}/${bytes.size} B) — retry",
                 )
             }
         }
