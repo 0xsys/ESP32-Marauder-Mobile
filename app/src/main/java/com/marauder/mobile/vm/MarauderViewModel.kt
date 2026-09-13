@@ -448,16 +448,20 @@ class MarauderViewModel(application: Application) : AndroidViewModel(application
 
     // --- On-phone capture helpers --------------------------------------------
 
-    /** On the first proto ≥ 2 handshake, enable saving and raise the line rate so
-     *  captures stream to the phone fast enough to keep up. */
+    /** On the first proto ≥ 2 handshake, enable saving to serial.
+     *
+     *  We deliberately DO NOT raise the line rate. Raising to a high baud proved
+     *  unreliable on the common CH340 USB-UART bridge: the device switches fine but
+     *  the bridge can't sustain the rate, corrupting the link — and once the device
+     *  is at the bad rate there is no way to command it back (a reconnect just
+     *  re-raises into garbage). 115200 is rock-solid and handles portal uploads and
+     *  header/handshake capture; a verified high-speed path can come back later. */
     private fun negotiateCapture(info: DeviceMessage.Info) {
         captureCapable = info.proto >= 2 || info.has("capstream")
         if (!captureCapable || negotiated) return
         negotiated = true
         viewModelScope.launch {
             usb.send("settings -s SavePCAP enable")
-            delay(150)
-            usb.send("jsonbaud $CAPTURE_BAUD") // setBaud() follows on the {"t":"baud"} reply
         }
     }
 
@@ -577,11 +581,24 @@ class MarauderViewModel(application: Application) : AndroidViewModel(application
                     appendConsole("> evilportal -c sethtmlstr ${bytes.size}", LineKind.INPUT)
                     usb.sendLineLocked("evilportal -c sethtmlstr ${bytes.size}")
                     recv = recvWait.await()
+                    appendConsole(
+                        recv?.let { "portal ▸ recv ok (device max ${it.max} B)" }
+                            ?: "portal ▸ recv TIMEOUT — no reply in 3 s",
+                        LineKind.SYSTEM,
+                    )
                     // Send the payload unless the device said its buffer is too small.
                     if (recv?.max?.let { it in 1 until bytes.size } != true) {
                         val setWait = async { withTimeoutOrNull(8000) { portalEvents.first { it.state == "set" } } }
+                        appendConsole("portal ▸ streaming ${bytes.size} B…", LineKind.SYSTEM)
                         usb.sendRawLocked(bytes)
                         set = setWait.await()
+                        appendConsole(
+                            set?.let { "portal ▸ set n=${it.bytes} crc=${it.crc} ok=${it.ok}" }
+                                ?: "portal ▸ set TIMEOUT — no confirm in 8 s",
+                            LineKind.SYSTEM,
+                        )
+                    } else {
+                        appendConsole("portal ▸ skipped: ${bytes.size} B > device max ${recv?.max} B", LineKind.SYSTEM)
                     }
                 }
             }
@@ -832,10 +849,6 @@ class MarauderViewModel(application: Application) : AndroidViewModel(application
         private const val MAX_CONSOLE = 800
         private const val MAX_SAMPLES = 120
 
-        // Line rate requested after the capstream handshake. 921600 is reliable on
-        // every common UART bridge (CP2102/CH340/FTDI) and ignored (harmlessly) by
-        // native-USB CDC boards, which already run at USB speed.
-        private const val CAPTURE_BAUD = 921600
         private const val APP_RELEASE = "marauder-mobile"
     }
 }
