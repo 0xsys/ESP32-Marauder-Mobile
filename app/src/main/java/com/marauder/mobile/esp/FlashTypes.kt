@@ -39,7 +39,7 @@ data class FlashProfile(
  */
 object Firmware {
     const val REPO = "0xsys/ESP32Marauder"
-    const val TAG = "v1.12.5-jsonserial"
+    const val TAG = "v1.12.6-jsonserial"
     const val RELEASE_PAGE = "https://github.com/0xsys/ESP32Marauder/releases/tag/$TAG"
 
     private fun merged(id: String, label: String, hardware: String, chip: Chip, token: String) =

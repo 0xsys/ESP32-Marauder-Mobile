@@ -219,8 +219,21 @@ class EspFlasher(private val link: SerialLink) {
         command(READ_REG, le32(reg), timeoutMs = 500).value
 
     private fun spiAttach() {
-        // ROM loader expects two little-endian words (arg, 0).
-        command(SPI_ATTACH, le32(0) + le32(0), timeoutMs = 3000)
+        // Chips with in-package flash (e.g. the ESP32-PICO in the M5StickC Plus 2)
+        // wire the SPI flash to non-default pins; the ROM won't attach it unless we
+        // pass the pad map read from eFuse. A standard board reads all-zero pads →
+        // value 0 = default pins (unchanged behaviour). Mirrors esptool's
+        // get_chip_spi_pads() + attach packing exactly.
+        val rdata5 = readReg(EFUSE_BLK0_RDATA5_REG)
+        val clk = rdata5 and 0x1F
+        val q = (rdata5 ushr 5) and 0x1F
+        val d = (rdata5 ushr 10) and 0x1F
+        val cs = (rdata5 ushr 15) and 0x1F
+        val hd = (readReg(EFUSE_BLK0_RDATA3_REG) ushr 4) and 0x1F
+        val pins = if ((clk or q or d or cs or hd) == 0) 0
+                   else (hd shl 24) or (cs shl 18) or (d shl 12) or (q shl 6) or clk
+        // ROM loader expects two little-endian words: (pin config, is_legacy/reserved).
+        command(SPI_ATTACH, le32(pins) + le32(0), timeoutMs = 3000)
     }
 
     private fun spiSetParams(flashSize: Int) {
@@ -377,5 +390,10 @@ class EspFlasher(private val link: SerialLink) {
 
         /** marauder_v4 is a 4 MiB ESP32-WROOM; used only for SPI param bounds. */
         private const val FLASH_SIZE_BYTES = 4 * 1024 * 1024
+
+        // eFuse BLK0 words holding the SPI flash pad map (read to attach in-package
+        // flash on ESP32-PICO boards). Addresses per esptool's ESP32 target.
+        private const val EFUSE_BLK0_RDATA5_REG = 0x3FF5A014.toInt()
+        private const val EFUSE_BLK0_RDATA3_REG = 0x3FF5A00C.toInt()
     }
 }
