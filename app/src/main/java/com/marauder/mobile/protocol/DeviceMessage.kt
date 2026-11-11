@@ -26,6 +26,10 @@ sealed interface DeviceMessage {
         val ips: Int,
         val probes: Int,
         val airtags: Int,
+        /** Remote ID (drone) record count. Proto >= 3; 0 on older firmware. */
+        val rid: Int = 0,
+        /** CSI motion detection running. Proto >= 3 and CSI-capable boards only. */
+        val csi: Boolean = false,
     ) : DeviceMessage
 
     data class JsonMode(val on: Boolean) : DeviceMessage
@@ -108,6 +112,59 @@ sealed interface DeviceMessage {
         val page: Int,
         val channels: List<Int>,
         val values: List<Int>,
+    ) : DeviceMessage
+
+    // --- proto >= 3 (v1.20.0 features) ---------------------------------------
+
+    /** One detected Remote ID (drone) record (`jsonlist d`). [lat]/[lon] are
+     *  1e-7 degree integers (divide by 1e7); valid only when [hasLocation]. */
+    data class Rid(
+        val index: Int,
+        val mac: String,
+        val uas: String,
+        val op: String,
+        val lat: Long,
+        val lon: Long,
+        val altMeters: Double,
+        val speedMps: Double,
+        val directionDeg: Int,
+        val rssi: Int,
+        val uaType: Int,
+        val packets: Long,
+        val hasLocation: Boolean,
+    ) : DeviceMessage {
+        val latitude: Double get() = lat / 1e7
+        val longitude: Double get() = lon / 1e7
+    }
+
+    /** One configured geofence (`jsonlist g`), 1-based [index] 1..5. */
+    data class Fence(
+        val index: Int,
+        val enabled: Boolean,
+        val lat: Double,
+        val lon: Double,
+        val radiusMiles: Double,
+        val name: String,
+    ) : DeviceMessage
+
+    /** A live Fox Hunt signal-strength sample for the current target. */
+    data class FoxHunt(
+        val name: String,
+        val rssi: Int,
+        val channel: Int,
+        val bt: Boolean,
+    ) : DeviceMessage
+
+    /** A CSI-motion status sample (~1 Hz). [motion]/[reliability]/[calibration]
+     *  are 0..100 percentages; [rate] is samples/sec. */
+    data class Csi(
+        val state: String,
+        val motion: Int,
+        val reliability: Int,
+        val rate: Int,
+        val calibration: Int,
+        val channel: Int,
+        val ap: String,
     ) : DeviceMessage
 
     data class Unknown(val type: String) : DeviceMessage

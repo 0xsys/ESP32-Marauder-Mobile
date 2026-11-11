@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.longOrNull
@@ -63,6 +64,8 @@ object LineParser {
                 ips = obj.int("ips"),
                 probes = obj.int("probes"),
                 airtags = obj.int("airtags"),
+                rid = obj.int("rid"),
+                csi = obj.bool("csi"),
             )
 
             "jsonmode" -> DeviceMessage.JsonMode(on = obj.bool("on"))
@@ -153,6 +156,48 @@ object LineParser {
                 values = obj.intList("v"),
             )
 
+            "rid" -> DeviceMessage.Rid(
+                index = obj.int("i"),
+                mac = obj.str("mac").orEmpty(),
+                uas = obj.str("uas").orEmpty(),
+                op = obj.str("op").orEmpty(),
+                lat = obj.long("lat"),
+                lon = obj.long("lon"),
+                altMeters = obj.dbl("alt"),
+                speedMps = obj.dbl("spd"),
+                directionDeg = obj.int("dir"),
+                rssi = obj.int("rssi"),
+                uaType = obj.int("ua"),
+                packets = obj.long("pkts"),
+                hasLocation = obj.bool("loc"),
+            )
+
+            "fence" -> DeviceMessage.Fence(
+                index = obj.int("i"),
+                enabled = obj.bool("en"),
+                lat = obj.dbl("lat"),
+                lon = obj.dbl("lon"),
+                radiusMiles = obj.dbl("r"),
+                name = obj.str("name").orEmpty(),
+            )
+
+            "fox" -> DeviceMessage.FoxHunt(
+                name = obj.str("name").orEmpty(),
+                rssi = obj.int("rssi"),
+                channel = obj.int("ch"),
+                bt = obj.bool("bt"),
+            )
+
+            "csi" -> DeviceMessage.Csi(
+                state = obj.str("state").orEmpty(),
+                motion = obj.int("motion"),
+                reliability = obj.int("rel"),
+                rate = obj.int("rate"),
+                calibration = obj.int("cal"),
+                channel = obj.int("ch"),
+                ap = obj.str("ap").orEmpty(),
+            )
+
             else -> DeviceMessage.Unknown(type)
         }
 
@@ -169,6 +214,8 @@ private fun JsonObject.str(key: String): String? = prim(key)?.contentOrNull
 private fun JsonObject.int(key: String): Int = prim(key)?.intOrNull ?: 0
 
 private fun JsonObject.long(key: String): Long = prim(key)?.longOrNull ?: 0L
+
+private fun JsonObject.dbl(key: String): Double = prim(key)?.doubleOrNull ?: 0.0
 
 private fun JsonObject.bool(key: String): Boolean = prim(key)?.booleanOrNull ?: false
 

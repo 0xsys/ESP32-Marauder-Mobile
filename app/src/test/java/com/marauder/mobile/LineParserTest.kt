@@ -114,4 +114,70 @@ class LineParserTest {
         assertEquals("a\"b", msg.user)
         assertEquals("p@ss w0rd", msg.pass)
     }
+
+    // --- proto >= 3 (v1.20.0) ------------------------------------------------
+
+    @Test
+    fun parsesStatusProto3Counters() {
+        val line = "@J {\"t\":\"status\",\"mode\":89,\"running\":true,\"free\":100,\"aps\":0,\"stas\":0,\"ssids\":0,\"ips\":0,\"probes\":0,\"airtags\":0,\"rid\":3,\"csi\":true}"
+        val msg = (LineParser.parse(line) as ParsedLine.Structured).message as DeviceMessage.Status
+        assertEquals(3, msg.rid)
+        assertTrue(msg.csi)
+    }
+
+    @Test
+    fun statusWithoutProto3CountersDefaultsToZero() {
+        // Old firmware (proto < 3) omits rid/csi; parser must default, not crash.
+        val line = "@J {\"t\":\"status\",\"mode\":0,\"running\":false,\"free\":1,\"aps\":0,\"stas\":0,\"ssids\":0,\"ips\":0,\"probes\":0,\"airtags\":0}"
+        val msg = (LineParser.parse(line) as ParsedLine.Structured).message as DeviceMessage.Status
+        assertEquals(0, msg.rid)
+        assertTrue(!msg.csi)
+    }
+
+    @Test
+    fun parsesRemoteIdDrone() {
+        val line = "@J {\"t\":\"rid\",\"i\":2,\"mac\":\"aa:bb:cc:dd:ee:ff\",\"uas\":\"UAS-123\",\"op\":\"OP-9\",\"lat\":377749000,\"lon\":-1224194000,\"alt\":120.5,\"spd\":4.2,\"dir\":270,\"rssi\":-55,\"ua\":2,\"pkts\":17,\"loc\":true}"
+        val msg = (LineParser.parse(line) as ParsedLine.Structured).message as DeviceMessage.Rid
+        assertEquals(2, msg.index)
+        assertEquals("UAS-123", msg.uas)
+        assertEquals(377749000L, msg.lat)
+        assertEquals(-1224194000L, msg.lon)
+        assertEquals(37.7749, msg.latitude, 1e-6)
+        assertEquals(-122.4194, msg.longitude, 1e-6)
+        assertEquals(120.5, msg.altMeters, 1e-6)
+        assertEquals(270, msg.directionDeg)
+        assertTrue(msg.hasLocation)
+    }
+
+    @Test
+    fun parsesGeofence() {
+        val line = "@J {\"t\":\"fence\",\"i\":1,\"en\":true,\"lat\":37.774900,\"lon\":-122.419400,\"r\":0.50,\"name\":\"Home\"}"
+        val msg = (LineParser.parse(line) as ParsedLine.Structured).message as DeviceMessage.Fence
+        assertEquals(1, msg.index)
+        assertTrue(msg.enabled)
+        assertEquals(37.7749, msg.lat, 1e-6)
+        assertEquals(0.5, msg.radiusMiles, 1e-6)
+        assertEquals("Home", msg.name)
+    }
+
+    @Test
+    fun parsesFoxHuntSample() {
+        val line = "@J {\"t\":\"fox\",\"name\":\"Target AP\",\"rssi\":-63,\"ch\":6,\"bt\":false}"
+        val msg = (LineParser.parse(line) as ParsedLine.Structured).message as DeviceMessage.FoxHunt
+        assertEquals("Target AP", msg.name)
+        assertEquals(-63, msg.rssi)
+        assertEquals(6, msg.channel)
+        assertTrue(!msg.bt)
+    }
+
+    @Test
+    fun parsesCsiSample() {
+        val line = "@J {\"t\":\"csi\",\"state\":\"MOTION\",\"motion\":82,\"rel\":90,\"rate\":60,\"cal\":100,\"ch\":1,\"ap\":\"MyAP\"}"
+        val msg = (LineParser.parse(line) as ParsedLine.Structured).message as DeviceMessage.Csi
+        assertEquals("MOTION", msg.state)
+        assertEquals(82, msg.motion)
+        assertEquals(90, msg.reliability)
+        assertEquals(60, msg.rate)
+        assertEquals("MyAP", msg.ap)
+    }
 }

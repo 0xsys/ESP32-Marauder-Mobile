@@ -78,7 +78,7 @@ import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.ui.graphics.vector.ImageVector
 
-/** The six structured lists the firmware can stream over `jsonlist`. */
+/** The structured lists the firmware can stream over `jsonlist`. */
 enum class ListType(val code: String, val title: String) {
     ACCESS_POINTS("a", "Access Points"),
     SSIDS("s", "SSIDs"),
@@ -86,6 +86,8 @@ enum class ListType(val code: String, val title: String) {
     IPS("i", "IP List"),
     PROBES("p", "Probe Requests"),
     AIRTAGS("t", "AirTags"),
+    DRONES("d", "Remote ID"),
+    GEOFENCES("g", "Geofences"),
 }
 
 enum class AnalyzerKind { WIFI, BT, CHANNEL }
@@ -185,7 +187,8 @@ object Catalog {
                     MenuItem("Detect Pineapple", "sniffpinescan", Icons.Filled.Router, Accent.SNIFFER, MenuAction.Send("sniffpinescan")),
                     MenuItem("Detect MultiSSID", "sniffmultissid", Icons.Filled.Dns, Accent.SNIFFER, MenuAction.Send("sniffmultissid")),
                     MenuItem("Scan AP/STA", "scanall", Icons.Filled.PermScanWifi, Accent.SNIFFER, MenuAction.Send("scanall")),
-                    MenuItem("Fox Hunt", "sigmon", Icons.Filled.SettingsInputAntenna, Accent.SNIFFER, MenuAction.Send("sigmon")),
+                    MenuItem("Fox Hunt", "Pick an AP, then tap Fox Hunt", Icons.Filled.SettingsInputAntenna, Accent.SNIFFER, MenuAction.OpenList(ListType.ACCESS_POINTS)),
+                    MenuItem("Recon Mission", "recon wifi", Icons.Filled.Radar, Accent.SNIFFER, MenuAction.Send("recon wifi")),
                     MenuItem("MAC Monitor", "mactrack", Icons.Filled.TrackChanges, Accent.SNIFFER, MenuAction.Send("mactrack")),
                     MenuItem("SAE Commit", "sniffsae", Icons.Filled.Lock, Accent.SNIFFER, MenuAction.Send("sniffsae")),
                 ),
@@ -292,6 +295,8 @@ object Catalog {
                     MenuItem("Bluetooth Analyzer", "Live BLE graph", Icons.Filled.GraphicEq, Accent.BLUETOOTH, MenuAction.OpenAnalyzer("analyzer -t bt", AnalyzerKind.BT)),
                     MenuItem("Flock Sniff", "sniffbt -t flock", Icons.Filled.Videocam, Accent.BLUETOOTH, MenuAction.Send("sniffbt -t flock")),
                     MenuItem("Meta Detect", "sniffbt -t meta", Icons.Filled.Visibility, Accent.BLUETOOTH, MenuAction.Send("sniffbt -t meta")),
+                    MenuItem("iBeacon Sniff", "sniffbt -t ibeacon", Icons.Filled.Sensors, Accent.BLUETOOTH, MenuAction.Send("sniffbt -t ibeacon")),
+                    MenuItem("Remote ID (Drones)", "remoteid scan", Icons.Filled.Radar, Accent.BLUETOOTH, MenuAction.Send("remoteid scan")),
                     MenuItem("Detect Card Skimmers", "sniffskim", Icons.Filled.CreditCard, Accent.BLUETOOTH, MenuAction.Send("sniffskim")),
                 ),
             ),
@@ -323,6 +328,7 @@ object Catalog {
                     MenuItem("GPS Tracker", "gpstracker -c start", Icons.Filled.Route, Accent.GPS, MenuAction.Send("gpstracker -c start")),
                     MenuItem("Stop Tracker", "gpstracker -c stop", Icons.Filled.Stop, Accent.GPS, MenuAction.Send("gpstracker -c stop")),
                     MenuItem("GPS POI", "Mark points of interest", Icons.Filled.PushPin, Accent.GPS, MenuAction.Submenu("gps_poi")),
+                    MenuItem("Geofences", "Configured fences", Icons.Filled.MyLocation, Accent.GPS, MenuAction.OpenList(ListType.GEOFENCES)),
                 ),
             ),
         )

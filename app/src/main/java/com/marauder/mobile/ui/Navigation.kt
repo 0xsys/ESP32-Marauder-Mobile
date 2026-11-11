@@ -94,7 +94,12 @@ fun AppRoot() {
             ) { entry ->
                 val type = runCatching { ListType.valueOf(entry.arguments?.getString("type").orEmpty()) }
                     .getOrDefault(ListType.ACCESS_POINTS)
-                ListScreen(type = type, vm = vm, onBack = { nav.popBackStack() })
+                ListScreen(
+                    type = type,
+                    vm = vm,
+                    onBack = { nav.popBackStack() },
+                    onOpenLive = { title, cmd -> nav.navigate(Routes.live(title, cmd)) },
+                )
             }
 
             composable(Routes.CONSOLE) {

@@ -19,6 +19,8 @@ object LiveClassifier {
         "attack", "blespam", "karma", "evilportal", "spoofat",
         "pingscan", "arpscan", "portscan",
         "gpsdata", "nmea", "gpstracker", "wardrive", "analyzer",
+        // v1.20.0 continuous features (stop with stopscan on exit)
+        "foxhunt", "csimotion", "remoteid", "recon", "findmy",
     )
 
     fun of(command: String): LiveSpec {
@@ -30,11 +32,21 @@ object LiveClassifier {
             head == "sniffprobe" -> ListType.PROBES
             head == "sniffbt" && c.contains("airtag") -> ListType.AIRTAGS
             head == "pingscan" || head == "arpscan" -> ListType.IPS
+            // `remoteid scan`/`track` populate the Remote ID (drone) list
+            head == "remoteid" && (c.contains("scan") || c.contains("track")) -> ListType.DRONES
             else -> null
         }
         // Commands that write a pcap/log the firmware would normally save to SD.
         // With proto ≥ 2 these are streamed to the phone and saved there instead.
         val capture = head.startsWith("sniff") || head == "wardrive"
-        return LiveSpec(list = list, continuous = head in continuousHeads, capture = capture)
+        // Sub-command-aware continuity: the state-changing verbs of the new
+        // multi-verb commands are one-shot, only their scanning verbs stream.
+        val continuous = when (head) {
+            "remoteid" -> c.contains("scan") || c.contains("track")
+            "recon" -> !c.contains("stop") && !c.contains("status")
+            "csimotion" -> c.contains("start")
+            else -> head in continuousHeads
+        }
+        return LiveSpec(list = list, continuous = continuous, capture = capture)
     }
 }

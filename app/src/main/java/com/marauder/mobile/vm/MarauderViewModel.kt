@@ -126,6 +126,17 @@ class MarauderViewModel(application: Application) : AndroidViewModel(application
     val probes: StateFlow<List<DeviceMessage.Probe>> = _probes.asStateFlow()
     private val _airtags = MutableStateFlow<List<DeviceMessage.Airtag>>(emptyList())
     val airtags: StateFlow<List<DeviceMessage.Airtag>> = _airtags.asStateFlow()
+    // proto >= 3 structured lists
+    private val _drones = MutableStateFlow<List<DeviceMessage.Rid>>(emptyList())
+    val drones: StateFlow<List<DeviceMessage.Rid>> = _drones.asStateFlow()
+    private val _geofences = MutableStateFlow<List<DeviceMessage.Fence>>(emptyList())
+    val geofences: StateFlow<List<DeviceMessage.Fence>> = _geofences.asStateFlow()
+
+    // proto >= 3 live streams (latest sample; drives the Fox Hunt / CSI readouts)
+    private val _foxHunt = MutableStateFlow<DeviceMessage.FoxHunt?>(null)
+    val foxHunt: StateFlow<DeviceMessage.FoxHunt?> = _foxHunt.asStateFlow()
+    private val _csi = MutableStateFlow<DeviceMessage.Csi?>(null)
+    val csi: StateFlow<DeviceMessage.Csi?> = _csi.asStateFlow()
 
     private val _listLoading = MutableStateFlow<ListType?>(null)
     val listLoading: StateFlow<ListType?> = _listLoading.asStateFlow()
@@ -180,6 +191,8 @@ class MarauderViewModel(application: Application) : AndroidViewModel(application
     private val ipBuf = ArrayList<DeviceMessage.Ip>()
     private val probeBuf = ArrayList<DeviceMessage.Probe>()
     private val airtagBuf = ArrayList<DeviceMessage.Airtag>()
+    private val ridBuf = ArrayList<DeviceMessage.Rid>()
+    private val fenceBuf = ArrayList<DeviceMessage.Fence>()
 
     private var consoleSeq = 0L
     private var sessionJob: Job? = null
@@ -744,6 +757,8 @@ class MarauderViewModel(application: Application) : AndroidViewModel(application
             is DeviceMessage.Ip -> ipBuf.add(msg)
             is DeviceMessage.Probe -> probeBuf.add(msg)
             is DeviceMessage.Airtag -> airtagBuf.add(msg)
+            is DeviceMessage.Rid -> ridBuf.add(msg)
+            is DeviceMessage.Fence -> fenceBuf.add(msg)
             is DeviceMessage.End -> commitList(msg.list)
             is DeviceMessage.Err -> {
                 appendConsole("✗ ${msg.cmd} ${msg.arg}".trim(), LineKind.ERROR)
@@ -751,6 +766,8 @@ class MarauderViewModel(application: Application) : AndroidViewModel(application
             }
             is DeviceMessage.AnalyzerSample -> onSample(msg)
             is DeviceMessage.ChannelActivity -> onChannelActivity(msg)
+            is DeviceMessage.FoxHunt -> _foxHunt.value = msg
+            is DeviceMessage.Csi -> _csi.value = msg
             is DeviceMessage.Portal -> portalEvents.tryEmit(msg)
             is DeviceMessage.Cred -> {
                 _evilPortal.value = _evilPortal.value.copy(
@@ -770,6 +787,8 @@ class MarauderViewModel(application: Application) : AndroidViewModel(application
             "i" -> { _ips.value = ipBuf.toList(); ipBuf.clear() }
             "p" -> { _probes.value = probeBuf.toList(); probeBuf.clear() }
             "t" -> { _airtags.value = airtagBuf.toList(); airtagBuf.clear() }
+            "d" -> { _drones.value = ridBuf.toList(); ridBuf.clear() }
+            "g" -> { _geofences.value = fenceBuf.toList(); fenceBuf.clear() }
         }
         _listLoading.value = null
     }
@@ -838,6 +857,8 @@ class MarauderViewModel(application: Application) : AndroidViewModel(application
         ListType.IPS -> ipBuf
         ListType.PROBES -> probeBuf
         ListType.AIRTAGS -> airtagBuf
+        ListType.DRONES -> ridBuf
+        ListType.GEOFENCES -> fenceBuf
     }
 
     private fun appendConsole(text: String, kind: LineKind) {

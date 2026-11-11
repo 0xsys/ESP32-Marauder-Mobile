@@ -24,6 +24,8 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.SettingsInputAntenna
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -62,6 +64,8 @@ fun ListContent(
     vm: MarauderViewModel,
     modifier: Modifier = Modifier,
     showActions: Boolean = true,
+    // Opens a live screen for a per-row action (Fox Hunt / CSI target a specific AP).
+    onOpenLive: (title: String, command: String) -> Unit = { _, _ -> },
 ) {
     val loading by vm.listLoading.collectAsState()
     val isLoading = loading == type
@@ -80,7 +84,14 @@ fun ListContent(
                 ListType.ACCESS_POINTS -> {
                     val data by vm.aps.collectAsState()
                     ListBody(data.isEmpty(), isLoading, "No access points", "Run a scan, then refresh.") {
-                        items(data, key = { it.index }) { ApRow(it) { sendAndRefresh("select -a ${it.index}") } }
+                        items(data, key = { it.index }) { ap ->
+                            ApRow(
+                                ap,
+                                onToggle = { sendAndRefresh("select -a ${ap.index}") },
+                                onHunt = { onOpenLive("Fox Hunt", "foxhunt -w ${ap.index}") },
+                                onCsi = { onOpenLive("CSI Motion", "csimotion start ${ap.index}") },
+                            )
+                        }
                     }
                 }
                 ListType.STATIONS -> {
@@ -111,6 +122,18 @@ fun ListContent(
                     val data by vm.airtags.collectAsState()
                     ListBody(data.isEmpty(), isLoading, "No AirTags", "Run an AirTag sniff, then refresh.") {
                         items(data, key = { it.index }) { AirtagRow(it) }
+                    }
+                }
+                ListType.DRONES -> {
+                    val data by vm.drones.collectAsState()
+                    ListBody(data.isEmpty(), isLoading, "No drones", "Run a Remote ID scan, then refresh.") {
+                        items(data, key = { it.index }) { DroneRow(it) }
+                    }
+                }
+                ListType.GEOFENCES -> {
+                    val data by vm.geofences.collectAsState()
+                    ListBody(data.isEmpty(), isLoading, "No geofences", "Set a geofence, then refresh.") {
+                        items(data, key = { it.index }) { FenceRow(it) }
                     }
                 }
             }
@@ -226,7 +249,12 @@ private fun SelectToggle(selected: Boolean, onToggle: () -> Unit) {
 }
 
 @Composable
-private fun ApRow(ap: DeviceMessage.Ap, onToggle: () -> Unit) {
+private fun ApRow(
+    ap: DeviceMessage.Ap,
+    onToggle: () -> Unit,
+    onHunt: (() -> Unit)? = null,
+    onCsi: (() -> Unit)? = null,
+) {
     RowCard(selected = ap.selected, onToggle = onToggle) {
         Column {
             Text(
@@ -250,6 +278,13 @@ private fun ApRow(ap: DeviceMessage.Ap, onToggle: () -> Unit) {
                 if (ap.packets > 0) Meta("${ap.packets} pkt")
                 if (ap.sec != 0) Icon(Icons.Filled.Lock, contentDescription = "secured", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
                 if (ap.wps) Meta("WPS", Warning)
+            }
+            if (onHunt != null || onCsi != null) {
+                Spacer(Modifier.size(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (onHunt != null) ActionChip("Fox Hunt", Icons.Filled.SettingsInputAntenna, MarauderCyan, onHunt)
+                    if (onCsi != null) ActionChip("CSI Motion", Icons.Filled.Sensors, Warning, onCsi)
+                }
             }
         }
     }
@@ -305,6 +340,48 @@ private fun AirtagRow(tag: DeviceMessage.Airtag) {
             Text(tag.mac, style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.size(4.dp))
             Text("${tag.rssi} dBm", style = MaterialTheme.typography.labelMedium, color = rssiColor(tag.rssi), fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun DroneRow(d: DeviceMessage.Rid) {
+    RowCard(selected = false, onToggle = null) {
+        Column {
+            Text(
+                d.uas.ifBlank { d.mac }.ifBlank { "Unknown drone" },
+                style = MaterialTheme.typography.titleMedium,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.size(4.dp))
+            if (d.op.isNotBlank()) Meta("Operator: ${d.op}")
+            if (d.hasLocation) {
+                Meta("%.5f, %.5f".format(d.latitude, d.longitude))
+                Meta("Alt ${d.altMeters.toInt()} m · ${"%.1f".format(d.speedMps)} m/s · ${d.directionDeg}°")
+            } else {
+                Meta("No location")
+            }
+            Spacer(Modifier.size(4.dp))
+            Text("${d.rssi} dBm", style = MaterialTheme.typography.labelMedium, color = rssiColor(d.rssi), fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun FenceRow(f: DeviceMessage.Fence) {
+    RowCard(selected = f.enabled, onToggle = null) {
+        Column {
+            Text(
+                "${f.index}. ${f.name.ifBlank { "Geofence ${f.index}" }}",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.size(4.dp))
+            Meta("%.5f, %.5f".format(f.lat, f.lon))
+            Meta("Radius ${"%.2f".format(f.radiusMiles)} mi · ${if (f.enabled) "enabled" else "disabled"}")
         }
     }
 }

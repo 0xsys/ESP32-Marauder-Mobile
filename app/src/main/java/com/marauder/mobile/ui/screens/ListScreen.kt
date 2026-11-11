@@ -20,7 +20,12 @@ import com.marauder.mobile.vm.MarauderViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ListScreen(type: ListType, vm: MarauderViewModel, onBack: () -> Unit) {
+fun ListScreen(
+    type: ListType,
+    vm: MarauderViewModel,
+    onBack: () -> Unit,
+    onOpenLive: (title: String, command: String) -> Unit = { _, _ -> },
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -40,6 +45,6 @@ fun ListScreen(type: ListType, vm: MarauderViewModel, onBack: () -> Unit) {
             )
         },
     ) { inner ->
-        ListContent(type = type, vm = vm, modifier = Modifier.padding(inner))
+        ListContent(type = type, vm = vm, modifier = Modifier.padding(inner), onOpenLive = onOpenLive)
     }
 }
